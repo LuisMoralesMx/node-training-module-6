@@ -17,7 +17,15 @@ export class AppService {
   }
 
   getCart(): CartEntity {
-    return null;
+    const items = this.repository.itemsStored;
+    const user: UserEntity = userMock;
+
+    return {
+      id: uuidv4(),
+      userId: user.id,
+      isDeleted: false,
+      items: items,
+    };
   }
 
   getOrder(): OrderEntity {
@@ -52,12 +60,12 @@ export class AppService {
     return this.repository.itemsStored;
   }
 
-  createOrder(user: UserEntity, items: CartItemEntity[]): OrderEntity {
+  createOrder(user: UserEntity, cartItems: CartItemEntity[]): OrderEntity {
     return {
       id: uuidv4(),
       userId: user.id,
       cartId: '4e2752c3-00c0-4647-8caf-f27c4e9bbd61',
-      items: items,
+      items: cartItems,
       payment: {
         type: 'Credit Card',
         address: 'Los Angeles 1225',
@@ -69,7 +77,9 @@ export class AppService {
       },
       comments: '',
       status: 'created',
-      total: 1,
+      total: cartItems.reduce((previousVal, currentVal) => {
+        return previousVal + currentVal.product.price * currentVal.count;
+      }, 0),
     };
   }
 }

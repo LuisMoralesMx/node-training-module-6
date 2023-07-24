@@ -9,5 +9,5 @@ export interface CartEntity {
   id: string;
   userId: string;
   isDeleted: boolean;
-  items: CartItemEntity;
+  items: CartItemEntity[];
 }
