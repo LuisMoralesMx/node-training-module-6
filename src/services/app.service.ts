@@ -17,25 +17,17 @@ export class AppService {
   }
 
   getCart(): CartEntity {
-    const items = this.repository.itemsStored;
-    const user: UserEntity = userMock;
-
-    return {
-      id: uuidv4(),
-      userId: user.id,
-      isDeleted: false,
-      items: items,
-    };
+    return this.repository.cartStored;
   }
 
   getOrder(): OrderEntity {
-    const items = this.repository.itemsStored;
+    const cart = this.repository.cartStored;
     const user: UserEntity = userMock;
 
     let order: OrderEntity = null;
 
-    if (items !== null && items.length > 0) {
-      order = this.createOrder(user, items);
+    if (cart !== null && cart.items.length > 0) {
+      order = this.createOrder(user, cart);
     } else {
       throw new HttpException('There are no items to generate the order', HttpStatus.BAD_REQUEST);
     }
@@ -43,29 +35,57 @@ export class AppService {
     return order;
   }
 
-  addItem(item: CartItemEntity) {
-    if (item.product.id) {
-      const product = catalogMock.filter((catalog) => catalog.id === item.product.id);
+  addItem(cart: CartEntity) {
+    if (cart.items[0].product.id) {
+      const cartId = this.validateCartId(cart, userMock);
 
-      this.repository.itemsStored.push({
-        product: product[0],
+      const newItem = cart.items.map((item) => ({
         count: item.count,
-      });
+        product: catalogMock.filter((catalog) => catalog.id === cart.items[0].product.id)[0],
+      }));
+
+      this.repository.cartStored = {
+        id: cartId,
+        userId: userMock.id,
+        isDeleted: false,
+        items: this.repository.cartStored?.items ? this.repository.cartStored?.items.concat(newItem) : newItem,
+      };
     } else {
-      throw new HttpException('Item does not exist in catalog,', HttpStatus.BAD_REQUEST);
+      throw new HttpException('Item does not exist in catalog', HttpStatus.BAD_REQUEST);
     }
   }
 
   fetchItems(): CartItemEntity[] {
-    return this.repository.itemsStored;
+    return this.repository.cartStored.items;
   }
 
-  createOrder(user: UserEntity, cartItems: CartItemEntity[]): OrderEntity {
+  updateItemCount(itemId: string, count: number) {
+    if (this.repository.cartStored?.items) {
+      const updated = this.repository.cartStored.items.map((item) => ({
+        ...item,
+        count: itemId === item.product.id ? count : item.count,
+      }));
+
+      this.repository.cartStored.items = updated;
+    }
+  }
+
+  deleteCart(cartId: string) {
+    if (this.repository.cartStored) {
+      if (this.repository.cartStored.id === cartId) {
+        this.repository.cartStored.isDeleted = true;
+      } else {
+        throw new HttpException('There is no cart to remove', HttpStatus.BAD_REQUEST);
+      }
+    }
+  }
+
+  createOrder(user: UserEntity, cartItems: CartEntity): OrderEntity {
     return {
       id: uuidv4(),
       userId: user.id,
       cartId: '4e2752c3-00c0-4647-8caf-f27c4e9bbd61',
-      items: cartItems,
+      items: cartItems.items,
       payment: {
         type: 'Credit Card',
         address: 'Los Angeles 1225',
@@ -77,9 +97,26 @@ export class AppService {
       },
       comments: '',
       status: 'created',
-      total: cartItems.reduce((previousVal, currentVal) => {
+      total: cartItems.items.reduce((previousVal, currentVal) => {
         return previousVal + currentVal.product.price * currentVal.count;
       }, 0),
     };
+  }
+
+  validateCartId(cart: CartEntity, user: UserEntity): any {
+    let cartId = null;
+
+    if (cart.id) {
+      // If exists, validate if the cartId for the current user.
+      if (cart.userId === user.id) {
+        cartId = cart.id;
+      } else {
+        throw new HttpException('User Id do not match', HttpStatus.BAD_REQUEST);
+      }
+    } else {
+      // If it does not exist, a new one is generated.
+      cartId = uuidv4();
+    }
+    return cartId;
   }
 }

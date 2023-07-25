@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { AppService } from './services/app.service';
 import { ProductEntity } from './schemas/product.entity';
 import { CartEntity, CartItemEntity } from './schemas/cart.entity';
@@ -14,13 +14,23 @@ export class AppController {
   }
 
   @Post('item')
-  addItems(@Body() item: CartItemEntity) {
-    return this.appService.addItem(item);
+  addItems(@Body() cart: CartEntity) {
+    return this.appService.addItem(cart);
+  }
+
+  @Put('item/:id/count/:count')
+  updateItemQuantity(@Param('id') id: string, @Param('count') count: number) {
+    return this.appService.updateItemCount(id, count);
+  }
+
+  @Delete('cart/:id')
+  deleteCart(@Param('id') id: string) {
+    return this.appService.deleteCart(id);
   }
 
   @Get('items')
-  async getItems(): Promise<CartItemEntity[]> {
-    return await this.appService.fetchItems();
+  getItems(): CartItemEntity[] {
+    return this.appService.fetchItems();
   }
 
   @Get('cart')

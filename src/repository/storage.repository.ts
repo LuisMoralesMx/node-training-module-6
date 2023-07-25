@@ -1,17 +1,17 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { CartItemEntity } from '../schemas/cart.entity';
+import { CartEntity, CartItemEntity } from '../schemas/cart.entity';
 
 @Injectable()
 export class RepositoryService {
-  itemsStored: CartItemEntity[] = [];
+  cartStored: CartEntity = null;
 
-  fetchItems(): CartItemEntity[] {
-    return this.itemsStored;
+  fetchItems(): CartEntity {
+    return this.cartStored;
   }
 
   storeItem(item: CartItemEntity) {
     if (item !== null && item.count > 1) {
-      this.itemsStored.push(item);
+      this.cartStored.items.push(item);
     } else {
       throw new HttpException('Bad Request', HttpStatus.BAD_REQUEST);
     }
