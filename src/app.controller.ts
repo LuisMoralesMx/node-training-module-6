@@ -1,45 +1,44 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { AppService } from './services/app.service';
-import { ProductEntity } from './schemas/product.entity';
-import { CartEntity, CartItemEntity } from './schemas/cart.entity';
-import { OrderEntity } from './schemas/order.entity';
+import { CartItemModel, CartModel } from './schemas/cart.entity';
+import { ProductModel } from './schemas/product.entity';
 
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get('products')
-  getProducts(): ProductEntity[] {
+  getProducts(): Promise<ProductModel[]> {
     return this.appService.getProducts();
   }
 
   @Post('item')
-  addItems(@Body() cart: CartEntity) {
+  addItems(@Body() cart: CartModel) {
     return this.appService.addItem(cart);
   }
 
   @Put('item/:id/count/:count')
-  updateItemQuantity(@Param('id') id: string, @Param('count') count: number) {
+  updateItemCount(@Param('id') id: number, @Param('count') count: number) {
     return this.appService.updateItemCount(id, count);
   }
 
-  @Delete('cart/:id')
-  deleteCart(@Param('id') id: string) {
-    return this.appService.deleteCart(id);
-  }
-
   @Get('items')
-  getItems(): CartItemEntity[] {
+  getItems(): Promise<CartItemModel[]> {
     return this.appService.fetchItems();
   }
 
   @Get('cart')
-  getCart(): CartEntity {
+  getCart(): Promise<CartModel[]> {
     return this.appService.getCart();
   }
 
-  @Get('order')
-  getOrder(): OrderEntity {
-    return this.appService.getOrder();
+  @Delete('cart/:id')
+  deleteCart(@Param('id') id: number) {
+    return this.appService.deleteCart(id);
+  }
+
+  @Get('order/:id')
+  getOrder(@Param('id') id: number): Promise<any> {
+    return this.appService.getOrderV1(id);
   }
 }

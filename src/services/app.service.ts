@@ -1,122 +1,127 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { ProductEntity } from '../schemas/product.entity';
-import { CartEntity, CartItemEntity } from '../schemas/cart.entity';
-import { OrderEntity } from '../schemas/order.entity';
+import { Injectable } from '@nestjs/common';
+import { CartItemModel, CartModel } from '../schemas/cart.entity';
 import { RepositoryService } from 'src/repository/storage.repository';
-import { catalogMock } from 'src/mocks/catalog.mock';
-import { userMock } from 'src/mocks/user.mock';
-import { UserEntity } from 'src/schemas/user.entity';
-import { v4 as uuidv4 } from 'uuid';
+import { PrismaClient } from '@prisma/client';
+import { ProductModel } from 'src/schemas/product.entity';
 
 @Injectable()
 export class AppService {
-  constructor(private repository: RepositoryService) {}
+  prisma: PrismaClient;
 
-  getProducts(): ProductEntity[] {
-    return catalogMock;
+  constructor(private repository: RepositoryService) {
+    this.prisma = new PrismaClient();
   }
 
-  getCart(): CartEntity {
-    return this.repository.cartStored;
+  async getProducts(): Promise<ProductModel[]> {
+    const products = await this.prisma.product.findMany();
+    return products;
   }
 
-  getOrder(): OrderEntity {
-    const cart = this.repository.cartStored;
-    const user: UserEntity = userMock;
+  async getCart(): Promise<CartModel[]> {
+    const products = await this.prisma.cart.findMany();
+    return products;
+  }
 
-    let order: OrderEntity = null;
+  async addItem(cart: CartModel) {
+    let createCart: CartModel;
+    let createItems: any;
 
-    if (cart !== null && cart.items.length > 0) {
-      order = this.createOrder(user, cart);
-    } else {
-      throw new HttpException('There are no items to generate the order', HttpStatus.BAD_REQUEST);
+    const findCart = await this.prisma.cart.findUnique({
+      where: {
+        id: cart.userId,
+      },
+    });
+
+    // Check if a cart already exist if not, let's create a cart entry.
+    if (!findCart) {
+      createCart = await this.prisma.cart.create({
+        data: {
+          userId: cart.userId,
+          isDeleted: cart.isDeleted,
+        },
+      });
     }
 
-    return order;
+    // Assign Cart Id
+    const cartId = findCart?.id ? findCart.id : createCart.id;
+
+    // If cart exist and there are items to add, let's create the items entry
+    if (cartId && cart.items && cart.items) {
+      createItems = await this.prisma.cartItem.create({
+        data: {
+          count: cart.items.count,
+          cartId: cartId,
+          productId: cart.items.productId,
+        },
+      });
+
+      return createItems;
+    }
   }
 
-  addItem(cart: CartEntity) {
-    if (cart.items[0].product.id) {
-      const cartId = this.validateCartId(cart, userMock);
+  async updateItemCount(itemId: number, count: number) {
+    const updateQuantity = await this.prisma.cartItem.update({
+      where: {
+        id: +itemId,
+      },
+      data: {
+        count: +count,
+      },
+    });
+    console.log(updateQuantity);
+    return updateQuantity;
+  }
 
-      const newItem = cart.items.map((item) => ({
-        count: item.count,
-        product: catalogMock.filter((catalog) => catalog.id === cart.items[0].product.id)[0],
-      }));
+  async fetchItems(): Promise<CartItemModel[]> {
+    const items = await this.prisma.cartItem.findMany();
+    return items;
+  }
 
-      this.repository.cartStored = {
+  async deleteCart(cartId: number) {
+    // 1st. Delete any reference to the cartId in the 'CartItem' table.
+    const deleteCartItems = await this.prisma.cartItem.deleteMany({
+      where: {
+        cartId: {
+          equals: cartId,
+        },
+      },
+    });
+
+    // 2nd. Delete any reference to the cartId in the 'Cart' table.
+    const deleteCart = await this.prisma.cart.delete({
+      where: {
         id: cartId,
-        userId: userMock.id,
-        isDeleted: false,
-        items: this.repository.cartStored?.items ? this.repository.cartStored?.items.concat(newItem) : newItem,
-      };
-    } else {
-      throw new HttpException('Item does not exist in catalog', HttpStatus.BAD_REQUEST);
-    }
-  }
+      },
+    });
 
-  fetchItems(): CartItemEntity[] {
-    return this.repository.cartStored.items;
-  }
-
-  updateItemCount(itemId: string, count: number) {
-    if (this.repository.cartStored?.items) {
-      const updated = this.repository.cartStored.items.map((item) => ({
-        ...item,
-        count: itemId === item.product.id ? count : item.count,
-      }));
-
-      this.repository.cartStored.items = updated;
-    }
-  }
-
-  deleteCart(cartId: string) {
-    if (this.repository.cartStored) {
-      if (this.repository.cartStored.id === cartId) {
-        this.repository.cartStored.isDeleted = true;
-      } else {
-        throw new HttpException('There is no cart to remove', HttpStatus.BAD_REQUEST);
-      }
-    }
-  }
-
-  createOrder(user: UserEntity, cartItems: CartEntity): OrderEntity {
     return {
-      id: uuidv4(),
-      userId: user.id,
-      cartId: '4e2752c3-00c0-4647-8caf-f27c4e9bbd61',
-      items: cartItems.items,
-      payment: {
-        type: 'Credit Card',
-        address: 'Los Angeles 1225',
-        creditCard: '000000000000',
-      },
-      delivery: {
-        type: 'Post',
-        address: 'Los Angeles 1225',
-      },
-      comments: '',
-      status: 'created',
-      total: cartItems.items.reduce((previousVal, currentVal) => {
-        return previousVal + currentVal.product.price * currentVal.count;
-      }, 0),
+      deletedCart: deleteCart,
+      deletedCartItems: deleteCartItems,
     };
   }
 
-  validateCartId(cart: CartEntity, user: UserEntity): any {
-    let cartId = null;
+  async getOrderV1(userId: number): Promise<any> {
+    const result = await this.prisma.$queryRaw`SELECT
+      (SELECT USR.NAME
+        FROM PUBLIC."User" USR
+        WHERE USR."id" = 1) AS NAME,
+    
+      (SELECT PDT.TITLE
+        FROM PUBLIC."Product" PDT
+        WHERE PDT.ID = ITM."productId") AS TITLE,
+    
+      (SELECT PDT.DESCRIPTION
+        FROM PUBLIC."Product" PDT
+        WHERE PDT.ID = ITM."productId") AS PRODUCT,
+    
+      (SELECT PDT.PRICE
+        FROM PUBLIC."Product" PDT
+        WHERE PDT.ID = ITM."productId") AS PRICE,
+      ITM.COUNT
+      FROM PUBLIC."Cart" CRT
+      LEFT JOIN PUBLIC."CartItem" ITM ON (CRT.ID = ITM."cartId")
+      WHERE CRT."userId" = ${+userId}`;
 
-    if (cart.id) {
-      // If exists, validate if the cartId for the current user.
-      if (cart.userId === user.id) {
-        cartId = cart.id;
-      } else {
-        throw new HttpException('User Id do not match', HttpStatus.BAD_REQUEST);
-      }
-    } else {
-      // If it does not exist, a new one is generated.
-      cartId = uuidv4();
-    }
-    return cartId;
+    return result;
   }
 }

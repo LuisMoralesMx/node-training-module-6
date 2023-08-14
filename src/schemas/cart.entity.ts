@@ -11,3 +11,15 @@ export interface CartEntity {
   isDeleted: boolean;
   items: CartItemEntity[];
 }
+
+export interface CartModel {
+  id: number;
+  userId: number;
+  isDeleted?: boolean;
+  items?: CartItemModel;
+}
+
+export interface CartItemModel {
+  productId: number;
+  count: number;
+}
