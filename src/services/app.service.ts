@@ -100,7 +100,7 @@ export class AppService {
     };
   }
 
-  async getOrderV1(userId: number): Promise<any> {
+  async getOrder(userId: number): Promise<any> {
     const result = await this.prisma.$queryRaw`SELECT
       (SELECT USR.NAME
         FROM PUBLIC."User" USR

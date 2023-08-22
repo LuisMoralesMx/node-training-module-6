@@ -39,6 +39,6 @@ export class AppController {
 
   @Get('order/:id')
   getOrder(@Param('id') id: number): Promise<any> {
-    return this.appService.getOrderV1(id);
+    return this.appService.getOrder(id);
   }
 }
