@@ -44,10 +44,10 @@ export class AppService {
     // Check if a cart already exist if not, let's create a cart entry.
     if (!cartAvailable) {
       cartItem.save();
+    } else {
+      // If cart exist and there are items to add, let's create the items entry
+      cartItem.updateOne({ id: cartDto.id }, cartDto);
     }
-
-    // If cart exist and there are items to add, let's create the items entry
-    cartItem.updateOne({ id: cartDto.id }, cartDto);
   }
 
   async updateItemCount(userId: string, itemId: string, count: number) {
